@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <font_tgx_Arial.h>
 #include <font_tgx_Arial_Bold.h>
+#include "Gm7CanProtocol.h"
 
 
 //DEBUG
@@ -136,7 +137,7 @@ class Constants {
     const char * const DEVICE_OWNER =             "GM7 Engineering";
     const char * const DEVICE_VENDOR =            "GM7 NL";
     const char * const DEVICE_SHORT_NAME =        "TIMEBMB";
-    const uint32_t     DEVICE_TYPE_ID =           0;
+    const uint16_t     DEVICE_TYPE_ID =           Gm7CanProtocol::DEVICE_TYPE_CONTROLLER_GM7UTB;
 
     //GENERIC
     const char* const emptyString = "\0";

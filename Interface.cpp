@@ -96,7 +96,7 @@ void Interface::boot(){
   tgxImage->drawText("Starting CAN controller...", iVec2 {2,86}, constants->colorGuiMenuTextContent[constants->getColorScheme()], constants->mediumFont.font, false);
   delay(20);
   tft->update(frameBuffer);
-  gm7Can->begin(Gm7Can::CONTROLLER, (uint16_t)constants->DEVICE_UID_32, constants->DEVICE_UID_64, constants->DEVICE_TYPE_ID, constants->DEVICE_MODEL, constants->DEVICE_SHORT_NAME, constants->DEVICE_VENDOR);
+  gm7Can->begin(constants->DEVICE_UID_64, constants->DEVICE_TYPE_ID, constants->DEVICE_MODEL, constants->DEVICE_SHORT_NAME, constants->DEVICE_VENDOR);
   tgxImage->drawText("DONE!", iVec2 {240,86}, constants->colorGuiMenuTextContent[constants->getColorScheme()], constants->mediumFont.font, false);
   delay(20);  
   tft->update(frameBuffer);
