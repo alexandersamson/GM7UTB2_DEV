@@ -28,42 +28,39 @@
 
 
 
-
-#include <Arduino.h>
-#include <ILI9341_T4.h>
-#include <tgx.h>
-#include <font_tgx_Arial.h>
-#include <font_tgx_Arial_Bold.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <SD.h>
-#include <SerialFlash.h>
-#include <SoftwareSerial.h>
-#include "TeensyThreads.h"
-#include <Chrono.h>
-#include "USBHost_t36.h"
-#include <ArduinoJson.h>
-#include <StreamUtils.h>
-#include "Constants.h"
-#include "Globals.h"
-#include "FileSystem.h"
-#include "AudioProcessing.h"
-#include <WS2812Serial.h>
-#include "Gm7Can.h"
-#include "GameTimer.h"
-#include "Gui.h"
-#include "GuiButtons.h"
-#include "Game.h"
-#include "Interface.h"
-#include "Sprites.h"
-#include "GameModule.h"
-#include "GMDisarmCode.h"
-#include "GMExternalModule.h"
-#include "Prompt.h"
-#include "PromptDeviceInfo.h"
-#include "PromptWelcomeScreen.h"
-#include "PromptShowHints.h"
-#include "NotificationBadge.h"
+//Sketch includes
+#include <Arduino.h>              //Default library
+#include <ILI9341_T4.h>           //Driver for the 320x240 16-bit color TFT-display, using the ILI9341 driver. This driver is optimized for DMA use on the Teensy 4.x [LGPL 2020 Arvind Singh]
+#include <tgx.h>                  //Graphics library used in conjuction with the display driver. [LGPL 2020 Arvind Singh]
+#include <font_tgx_Arial.h>       //Arial font pack 8-96 size
+#include <font_tgx_Arial_Bold.h>  //Arial bold font pack 8-96 size
+#include <Wire.h>                 //Default I2C library
+#include <SPI.h>                  //Default SPI library
+#include <SD.h>                   //Default SD library, optimized by PJRC for faster operation on the Teensy 4.1
+#include <Chrono.h>               //Alternative to the 'Metro' interval timer [GPL 2015 Sofian Audry]
+#include "USBHost_t36.h"          //USB host controller for the T3.5/6 and T4.x [MIT? 2017 Paul Stoffregen]
+#include <ArduinoJson.h>          //[2014-2022 Benoit Blanchon]
+#include <StreamUtils.h>          //[2019-2022 Benoit Blanchon]
+#include <WS2812Serial.h>         //This library makes it possible to use a Serial port to drive Neopixels. In this way we can circumvent blocking interrupts. [MIT? 2017 Paul Stoffregen]
+#include "Gm7Can.h"               //CAN Bus library by GM7 Engineering, which is an application layer based on FlexCAN_T4 by 2018 Antonio Alexander Brewer
+#include "Constants.h"            //Project file. Anything that's supposed to be globally available and unchanging, can go in here
+#include "Globals.h"              //Project file. Anything that's supposed to be globally available and mutable, can go in here
+#include "FileSystem.h"           //Project file. Anything that has to do with files, saving, loading, JSON and bulk dataprocessing should be in here
+#include "AudioProcessing.h"      //Project file. Handles anything to do with audio
+#include "GameTimer.h"            //Project file. Handles (game)timers and their functionality
+#include "Gui.h"                  //Project file. Handles menu's and the flow of user input in them
+#include "GuiButtons.h"           //Project file. Takes care of the buttons that show in the GUI
+#include "Game.h"                 //Project file. Gameplay is controlled by this
+#include "Interface.h"            //Project file. The interface stitches everything together. All inputs are relayed to corresponding actions trough the Interface or by it's means.
+#include "Sprites.h"              //Project file. Some sprites that can be used to draw on the TGX image (Be careful: The GM7 logo in this file is under strict copyright, held by GM7 Engineering in The Netherlands; the other sprites are public domain)
+#include "GameModule.h"           //Project file.
+#include "GMDisarmCode.h"         //Project file.
+#include "GMExternalModule.h"     //Project file.
+#include "Prompt.h"               //Project file.
+#include "PromptDeviceInfo.h"     //Project file.
+#include "PromptWelcomeScreen.h"  //Project file.
+#include "PromptShowHints.h"      //Project file.
+#include "NotificationBadge.h"    //Project file.
 
 
 
@@ -83,19 +80,15 @@
 #define PIN_CS 9           // optional (but recommended), can be any pin.
 #define PIN_RESET 6        // optional (but recommended), can be any pin.
 #define PIN_BACKLIGHT 255  // optional, set this only if the screen LED pin is connected directly to the Teensy.
-#define PIN_TOUCH_IRQ 255  // optional, set this only if the touchscreen is connected on the same SPI bus
-#define PIN_TOUCH_CS 255   // optional, set this only if the touchscreen is connected on the same spi bus
-
-
 
 
 // the screen driver object
-ILI9341_T4::ILI9341Driver tft(PIN_CS, PIN_DC, PIN_SCK, PIN_MOSI, PIN_MISO, PIN_RESET, PIN_TOUCH_CS, PIN_TOUCH_IRQ);
+ILI9341_T4::ILI9341Driver tft(PIN_CS, PIN_DC, PIN_SCK, PIN_MOSI, PIN_MISO, PIN_RESET);
 
 
-// 2 diff buffers with 12K memory each
-ILI9341_T4::DiffBuffStatic<12288> diff1;
-ILI9341_T4::DiffBuffStatic<12288> diff2;
+// 2 diff buffers with 10K memory each
+ILI9341_T4::DiffBuffStatic<10240> diff1;
+ILI9341_T4::DiffBuffStatic<10240> diff2;
 
 
 // Screen size in landscape mode
@@ -103,8 +96,8 @@ ILI9341_T4::DiffBuffStatic<12288> diff2;
 #define LY 240
 
 // 30MHz SPI. can do better with short wires
-#define SPI_SPEED 78000000
-#define SPI_SPEED_READ 32000000
+#define SPI_SPEED 78000000 //This was the max I could push it for. Anything higher resulted in pixels being set at random spots at random time intervals. ^Alexander
+#define SPI_SPEED_READ 32000000 //Setting this higher that 35000000 resulted in throttling down for some reason. ^Alexander
 
 // the framebuffers
 DMAMEM uint16_t internal_fb[LX * LY];  // used by the library for buffering (in DMAMEM)
@@ -117,7 +110,7 @@ Chrono chronoTimerFps60;
 Chrono chronoTimerFps100;
 Chrono chronoTimerFps200;
 
-// namespace for draw graphics primitives
+// namespace for drawing graphics primitives
 using namespace tgx;
 
 // image that encapsulates the framebuffer fb.
@@ -142,9 +135,6 @@ GameTimer gameTimerMain = GameTimer(&constants, &globals);
 
 //INTERFACE
 Interface interface = Interface(&fileSystem, &gm7Can, &tgxImage, &sprites, &audioProcessor, &constants, &globals, &tft, frameBuffer);
-
-
-
 
 
 //GAME MODULES & GAME
@@ -175,7 +165,6 @@ PromptWelcomeScreen promptWelcomeScreen = PromptWelcomeScreen(&tgxImage, &sprite
 PromptDeviceInfo    promptDeviceInfo =    PromptDeviceInfo(&tgxImage, &sprites, &constants, &globals, &interface, &guiButtons);
 PromptShowHints     promptShowHints =    PromptShowHints(&tgxImage, &sprites, &constants, &globals, &interface, &guiButtons);
 Prompt * prompts[promptsCount] = { &promptWelcomeScreen, &promptDeviceInfo, &promptShowHints };
-
 
 
 Gui gui = Gui(&tgxImage, &sprites, &interface, &constants, &globals, &guiButtons, &notificationBadge, prompts, promptsCount);
@@ -218,6 +207,7 @@ WS2812Serial neopixelSerial(NEOPIXEL_NUMPIXELS, displayMemory, drawingMemory, NE
 
 
 //MAIN FUNCTIONS
+//TODO: Place these somewhere else.
 
 // draw a filled rectangle in the framebuffer
 void drawRectFilled(uint16_t *fb, int x, int y, int lx, int ly, uint16_t color) {
@@ -228,31 +218,11 @@ void drawRectFilled(uint16_t *fb, int x, int y, int lx, int ly, uint16_t color) 
   }
 }
 
-
 /** fill a framebuffer with a given color */
 void clear(uint16_t *fb, uint16_t color = 0) {
   for (int i = 0; i < LX * LY; i++) fb[i] = color;
 }
 
-/** draw a disk centered at (x,y) with radius r and color col on the framebuffer fb */
-void drawDisk(uint16_t *fb, double x, double y, double r, uint16_t col) {
-  int xmin = (int)(x - r);
-  int xmax = (int)(x + r);
-  int ymin = (int)(y - r);
-  int ymax = (int)(y + r);
-  if (xmin < 0) xmin = 0;
-  if (xmax >= LX) xmax = LX - 1;
-  if (ymin < 0) ymin = 0;
-  if (ymax >= LY) ymax = LY - 1;
-  const double r2 = r * r;
-  for (int j = ymin; j <= ymax; j++) {
-    double dy2 = (y - j) * (y - j);
-    for (int i = xmin; i <= xmax; i++) {
-      const double dx2 = (x - i) * (x - i);
-      if (dx2 + dy2 <= r2) fb[i + (j * LX)] = col;
-    }
-  }
-}
 
 
 
@@ -290,6 +260,7 @@ void drawSimpleProgressBarHorizontal(uint16_t *fb, long curValue, long valueMin,
 
 
 //MAIN COUNTDOWN TIMER
+//TODO: Relocate this method to somewhere more fitting
 uint16_t timerColor =    0b0000011111100001;
 uint16_t timerBgColor =  0b0000000001100000;
 uint16_t timerBarColor = 0b0000000010000001;
