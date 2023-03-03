@@ -188,12 +188,14 @@ class Interface {
   //CAN TRANSCEIVER
   void parseCanRxBufferStorage();
   void sendMainTimerOverCan(uint32_t timerCurrent, uint32_t timerSet);
+  void sendValidationTimerOverCan(uint32_t timerCurrent, uint32_t timerSet);
   void processDeviceRegistrationRequest(uint16_t uid, uint16_t pmid, char * payload);
   void processReceivedDeviceData(uint16_t uid, uint16_t pmid, char * payload);
   void processReceivedCanModuleData(uint16_t uid, uint16_t pmid, char * payload);
 
   //LOOP INTERFACE
   void loop();
+
   //AUDIO FEEDBACK
   void playBeep();
   void playBlip();

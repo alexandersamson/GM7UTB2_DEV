@@ -3,6 +3,7 @@
 #define Globals_h
 #include <Arduino.h>
 #include "Constants.h"
+#include "Gm7CanProtocol.h"
 
 class Globals {
 
@@ -119,11 +120,12 @@ public:
   };
 
 
-  //This indexer is used to assign ID's t new (external) modules. In that way config files can be attached to these modules.
+  //This indexer is used to assign ID's t new  modules. In that way config files can be attached to these modules.
   uint16_t modulesAssignedIdIndexer = 0;
 
   //SYSTEM CONTROLS
   bool systemIsOnline = true;
+  bool wakeUpOnCan = true; //When systemIsOnline == false, wakeUpOnCan determines if CAN functionality needs to stay active in order to turn on the system again.
   void haltSystem(){
     systemIsOnline = false;
   };
@@ -135,6 +137,38 @@ public:
   bool getSystemIsOnline(){
     return systemIsOnline;
   };
+
+  bool getWakeUpOnCanIsEnabled(){
+    return wakeUpOnCan;
+  };
+
+
+  struct ExternalGameModuleData {
+    bool isRegistered = false;
+    uint32_t lastHeartbeat;
+    uint16_t canUid;
+    uint64_t uid64;
+    uint16_t deviceTypeId;
+    char deviceModel[Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX + 1] = "\0";
+    char deviceShortName[Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX + 1] = "\0";
+    char deviceVendor[Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX + 1] = "\0";
+    uint32_t deviceStatus = 0; //Technical status
+    uint32_t status = 0; //'Game' status
+    uint16_t progress = 0;
+    uint16_t progressMax = 0;
+    uint16_t triesCurrent = 0;
+    uint16_t triesMax = 0;
+    uint16_t triesTotal = 0;
+    uint16_t triesFlags = 0;
+    uint32_t mainTimerMillisCurrent = 0;
+    uint32_t mainTimerMillisSet = 0;
+    uint32_t validationTimerMillisCurrent = 0;
+    uint32_t validationTimerMillisSet = 0;
+    uint32_t internalTimerMillisCurrent = 0;
+    uint32_t internalTimerMillisSet = 0;
+  };
+
+  ExternalGameModuleData externalGameModuleData[EXTERNAL_MODULES_COUNT_MAX];
 
   //DEBUG HANDLERS
   #define MAX_MESSAGES_COUNT 6

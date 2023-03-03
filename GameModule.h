@@ -148,6 +148,8 @@ public:
   virtual   void setState(uint32_t st) = 0;
   virtual   uint32_t getProgress() = 0;
   virtual   void setProgress(uint32_t progr) = 0; 
+  virtual   uint32_t getValidationTimerCurrentMillisLeft() = 0;
+  virtual   uint32_t getValidationTimerSetMillis() = 0;
   virtual   void inputKeyboard(char key) = 0;
   virtual   void inputInteger(uint32_t) = 0;
   virtual   void setGameModifierOutput(uint16_t newValue) =0;

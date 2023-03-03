@@ -55,7 +55,6 @@
 #include "Sprites.h"              //Project file. Some sprites that can be used to draw on the TGX image (Be careful: The GM7 logo in this file is under strict copyright, held by GM7 Engineering in The Netherlands; the other sprites are public domain)
 #include "GameModule.h"           //Project file.
 #include "GMDisarmCode.h"         //Project file.
-#include "GMExternalModule.h"     //Project file.
 #include "Prompt.h"               //Project file.
 #include "PromptDeviceInfo.h"     //Project file.
 #include "PromptWelcomeScreen.h"  //Project file.
@@ -63,10 +62,6 @@
 #include "NotificationBadge.h"    //Project file.
 
 
-
-
-//setting_timer_main=3610
-//setting_client_api_key=5y654y5v546647v6trvtyy6thv6hgjgh
 
 
 //
@@ -96,8 +91,8 @@ ILI9341_T4::DiffBuffStatic<10240> diff2;
 #define LY 240
 
 // 30MHz SPI. can do better with short wires
-#define SPI_SPEED 78000000 //This was the max I could push it for. Anything higher resulted in pixels being set at random spots at random time intervals. ^Alexander
-#define SPI_SPEED_READ 32000000 //Setting this higher that 35000000 resulted in throttling down for some reason. ^Alexander
+#define SPI_SPEED 78000000 //This (78MHz) was the max I could push it for. Anything higher resulted in pixels being set at random spots at random time intervals. ^Alexander
+#define SPI_SPEED_READ 32000000 //Setting this higher than 35000000 resulted in throttling down for some reason. ^Alexander
 
 // the framebuffers
 DMAMEM uint16_t internal_fb[LX * LY];  // used by the library for buffering (in DMAMEM)
@@ -141,17 +136,11 @@ Interface interface = Interface(&fileSystem, &gm7Can, &tgxImage, &sprites, &audi
 GameTimer validationTimerDisarmCode = GameTimer(&constants, &globals);
 GameTimer internalModuleTimerDisarmCode = GameTimer(&constants, &globals);
 
-//Internal game modules
+//Internal game modules (MODULES_COUNT is found in Constants.h)
 GMDisarmCode moduleDisarmCode = GMDisarmCode(&tgxImage, &sprites, &interface, &internalModuleTimerDisarmCode, &validationTimerDisarmCode, &constants, &globals);
+GameModule * modules[MODULES_COUNT] = { &moduleDisarmCode };
 
-//External game module slots
-GMExternalModule externalModule0 = GMExternalModule(&tgxImage, &sprites, &interface, &internalModuleTimerDisarmCode, &validationTimerDisarmCode, &constants, &globals);
-GMExternalModule externalModule1 = GMExternalModule(&tgxImage, &sprites, &interface, &internalModuleTimerDisarmCode, &validationTimerDisarmCode, &constants, &globals);
-GMExternalModule externalModule2 = GMExternalModule(&tgxImage, &sprites, &interface, &internalModuleTimerDisarmCode, &validationTimerDisarmCode, &constants, &globals);
-GMExternalModule externalModule3 = GMExternalModule(&tgxImage, &sprites, &interface, &internalModuleTimerDisarmCode, &validationTimerDisarmCode, &constants, &globals);
-
-GameModule * modules[MODULES_COUNT] = { &moduleDisarmCode, &externalModule0, &externalModule1, &externalModule2, &externalModule3 };
-
+//GAME
 Game game = Game(&interface, &gameTimerMain, &audioProcessor, &constants, &globals, modules, MODULES_COUNT);
 
 
@@ -193,7 +182,7 @@ bool show_changed_only = false;
 
 
 
-//NEOPIXEL
+//NEOPIXEL (Using the WS2812Serial library)
 #define NEOPIXEL_PIN 20 //Teensy 4.1 TX pin on Serial5
 #define NEOPIXEL_NUMPIXELS 10
 byte drawingMemory[NEOPIXEL_NUMPIXELS*3];         //  3 bytes per LED
@@ -258,8 +247,9 @@ void drawSimpleProgressBarHorizontal(uint16_t *fb, long curValue, long valueMin,
 
 
 
-
-//MAIN COUNTDOWN TIMER
+////////////////////////
+//  MAIN COUNTDOWN TIMER
+////////////////////////
 //TODO: Relocate this method to somewhere more fitting
 uint16_t timerColor =    0b0000011111100001;
 uint16_t timerBgColor =  0b0000000001100000;
@@ -354,10 +344,10 @@ void canVisualizerLoop(){
 }
 
 
+
 //////////////////////////
 //  DISPLAY UPDATE ASYNC
 //////////////////////////
-
 void updateDisplayAsync() {
   clear(frameBuffer);
   //tgxImage.drawFastHLine(iVec2{1,32},50,RGB565_Red);
@@ -369,7 +359,6 @@ void updateDisplayAsync() {
   tft.overlayFPS(frameBuffer);
   tft.update(frameBuffer);
 }
-
 
 
 
@@ -386,14 +375,10 @@ void neopixelLoop(){
 
 
 
-//////////////////////
-// CAN CALLBACK METHOD
-//////////////////////
 
 ////////////
 //  SETUP
 ////////////
-
 void setup() {
 
   //DISPLAY BOOTING
@@ -443,7 +428,6 @@ void setup() {
 
 
 
-
 void loop() {
   
   if (chronoTimerFps200.hasPassed(5)){
@@ -480,8 +464,9 @@ void loop() {
   }
 
   //Loop CAN
-  gm7Can.loop();
-
+  if((globals.getSystemIsOnline() == true) || (globals.getWakeUpOnCanIsEnabled() == true)){
+    gm7Can.loop();
+  } 
 
   if(Serial.available()){
     interface.processSerialRxChar(Serial.read());

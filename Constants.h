@@ -57,7 +57,8 @@
 
 
 //MODULES
-#define MODULES_COUNT 5
+#define MODULES_COUNT 1
+#define EXTERNAL_MODULES_COUNT_MAX 10
 #define MODULE_CONFIG_MAX_COMMAND_STRINGS 10  //Every module can use up to 10 strings per effect, such as contributing to disarmament, bonus time, actuators, or punishment
 #define MODULE_CONFIG_STRING_MAX_LENGTH 16
 

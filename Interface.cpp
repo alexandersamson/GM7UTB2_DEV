@@ -379,14 +379,18 @@ void Interface::parseCanRxBufferStorage(){
   while(gm7Can->canBufferStorageCountAvailable[CAN_BUFFER_STORAGE_INDEX_RX]){
     Gm7Can::CanBuffer canBuffer = gm7Can->readFromCanBufferStorage(CAN_BUFFER_STORAGE_INDEX_RX);
     Serial.println(canBuffer.pmid, DEC);  
+    Serial.println(canBuffer.uid, DEC);  
     if(canBuffer.pmid == gm7Can->canProtocol.MODULE_STATUS_AND_PROGRESS){
       globals->addMessage(0,0,"MODULE STATUS CHANGED", false, 2000);  
     }
-    if((canBuffer.pmid > gm7Can->canProtocol.DEVICE_SECTION_START) && (canBuffer.pmid < gm7Can->canProtocol.DEVICE_SECTION_END)){
+    if((canBuffer.pmid > gm7Can->canProtocol.DEVICE_SECTION_START) && (canBuffer.pmid < gm7Can->canProtocol.DEVICE_SECTION_END)){// Generic device data received
       processReceivedDeviceData(canBuffer.uid, canBuffer.pmid, canBuffer.payload);
     }
-    if(((canBuffer.pmid > gm7Can->canProtocol.DEVICE_TYPE_SECTION_START) && (canBuffer.pmid < gm7Can->canProtocol.DEVICE_TYPE_SECTION_END)) || (canBuffer.pmid == gm7Can->canProtocol.DEVICE_REGISTRATION_REQUEST)){
+    if(((canBuffer.pmid > gm7Can->canProtocol.DEVICE_TYPE_SECTION_START) && (canBuffer.pmid < gm7Can->canProtocol.DEVICE_TYPE_SECTION_END)) || (canBuffer.pmid == gm7Can->canProtocol.DEVICE_REGISTRATION_REQUEST)){ //Registrationrequest received
       processDeviceRegistrationRequest(canBuffer.uid, canBuffer.pmid, canBuffer.payload);
+    }
+    if((canBuffer.pmid > gm7Can->canProtocol.MODULE_SECTION_START) && (canBuffer.pmid < gm7Can->canProtocol.MODULE_SECTION_END)){ //Specific module data received
+      processReceivedCanModuleData(canBuffer.uid, canBuffer.pmid, canBuffer.payload);
     }
   }
 
@@ -394,8 +398,14 @@ void Interface::parseCanRxBufferStorage(){
 
 //Sends the game main timer over can to the network. It sends the current time and the set time, both in uint32 milliseconds formats.
 void Interface::sendMainTimerOverCan(uint32_t timerCurrent, uint32_t timerSet){
-  gm7Can->sendTimerData(gm7Can->canProtocol.CONTROLLER_MAIN_TIMER_STATUS, timerCurrent, timerSet);
+  gm7Can->sendMainTimer(timerCurrent, timerSet);
 }
+
+//Sends the game validation timer over can to the network. It sends the current time and the set time, both in uint32 milliseconds formats.
+void Interface::sendValidationTimerOverCan(uint32_t timerCurrent, uint32_t timerSet){
+  gm7Can->sendValidationTimer(timerCurrent, timerSet);
+}
+
 
 
 void Interface::processDeviceRegistrationRequest(uint16_t uid, uint16_t pmid, char * payload){
@@ -404,8 +414,8 @@ void Interface::processDeviceRegistrationRequest(uint16_t uid, uint16_t pmid, ch
     return;
   }
   if(pmid == gm7Can->canProtocol.DEVICE_TYPE_MODULE_GAME_MODULE){ //When it's a game module
-    for(int i = 0; i < MODULES_COUNT; i++){
-      if(globals->moduleConfigs[i].isExternalCanModule == true && globals->moduleConfigs[i].hasAssignedId == true && globals->moduleConfigs[i].canUid == uid){
+    for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+      if(globals->externalGameModuleData[i].isRegistered == true && globals->externalGameModuleData[i].canUid == uid){
         //It's already registered and found, just turn it online.
         //TODO: IMPLEMENT THIS
         Serial.print("Existing registration. RegistrationRequest from: "); Serial.println(uid);
@@ -413,27 +423,61 @@ void Interface::processDeviceRegistrationRequest(uint16_t uid, uint16_t pmid, ch
       }
     }
     //2. When no existing module has been found, register a new one if there's a place available in the modules buffer (#define in constants >> MODULES_COUNT).
-    for(int i = 0; i < MODULES_COUNT; i++){
-      if(globals->moduleConfigs[i].isExternalCanModule == true && globals->moduleConfigs[i].hasAssignedId == false){
+    for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+      if(globals->externalGameModuleData[i].isRegistered == false){
         //There's an unassigned external module location available in the buffer. We can assign it to this module.
-        //TODO: IMPLEMENT THIS
+        globals->externalGameModuleData[i].isRegistered = true; //register it
+        globals->externalGameModuleData[i].canUid = uid;
+        if((pmid > gm7Can->canProtocol.DEVICE_TYPE_SECTION_START) && (pmid < gm7Can->canProtocol.DEVICE_TYPE_SECTION_END)){
+          //If the PMID is within the range of the preset DEVICE TYPES (Gm7CanProtocol.h), we can assume its device type ID is just the PMID
+          globals->externalGameModuleData[i].deviceTypeId = pmid;
+        } else {
+          //In any other case we need to extract the Device Type Id from the payload
+          globals->externalGameModuleData[i].deviceTypeId = gm7Can->canProtocol.extractUint16FromBuffer(payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX, 0);
+        }
         Serial.print("New registration. RegistrationRequest from: "); Serial.println(uid);
         return;
       }
     }
   }
 
-
-}
+} //END of processDeviceRegistrationRequest()
 
 
 void Interface::processReceivedDeviceData(uint16_t uid, uint16_t pmid, char * payload){
+  for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+    if((globals->externalGameModuleData[i].canUid == uid) && (globals->externalGameModuleData[i].isRegistered == true)){
+      if(pmid == gm7Can->canProtocol.DEVICE_SERIAL){ globals->externalGameModuleData[i].uid64 = gm7Can->canProtocol.extractUint64FromBuffer(payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX, 0);} //UID64 (Serial)
+      if(pmid == gm7Can->canProtocol.DEVICE_TYPE_ID){ globals->externalGameModuleData[i].deviceTypeId = gm7Can->canProtocol.extractDeviceTypeIdFromBuffer(payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX);} //Device Type Id (uint16)
+      if(pmid == gm7Can->canProtocol.DEVICE_MODEL){ strlcpy(globals->externalGameModuleData[i].deviceModel, payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX);}//Model
+      if(pmid == gm7Can->canProtocol.DEVICE_VENDOR){ strlcpy(globals->externalGameModuleData[i].deviceVendor, payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX);}//Vendor
+      if(pmid == gm7Can->canProtocol.DEVICE_SHORT_NAME){ strlcpy(globals->externalGameModuleData[i].deviceShortName, payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX);}//Short name
+      // Serial.print("UIDCAN: "); Serial.println(globals->externalGameModuleData[i].canUid);
+      // Serial.print("UID_64: "); Serial.println((uint32_t)globals->externalGameModuleData[i].uid64);  
+      // Serial.print("DEVTID: "); Serial.println(globals->externalGameModuleData[i].deviceTypeId);  
+      // Serial.print("MODEL : "); Serial.println(globals->externalGameModuleData[i].deviceModel);  
+      // Serial.print("VENDOR: "); Serial.println(globals->externalGameModuleData[i].deviceVendor);  
+      // Serial.print("S.NAME: "); Serial.println(globals->externalGameModuleData[i].deviceShortName);        
+    }
+  }
 
 }
 
 
 void Interface::processReceivedCanModuleData(uint16_t uid, uint16_t pmid, char * payload){
-  
+  for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+    if((globals->externalGameModuleData[i].canUid == uid) && (globals->externalGameModuleData[i].isRegistered == true)){
+      if(pmid == gm7Can->canProtocol.MODULE_STATUS_AND_PROGRESS){
+        Gm7CanProtocol::StatusAndProgress statusAndProgress = gm7Can->canProtocol.decodeModuleStatusAndProgress(payload, Gm7CanProtocol::DEFAULT_CAN_MESSAGE_LENGTH_MAX);
+        globals->externalGameModuleData[i].status = statusAndProgress.status;
+        globals->externalGameModuleData[i].progress = statusAndProgress.progress;
+        globals->externalGameModuleData[i].progressMax = statusAndProgress.progressMax;
+        Serial.print("STATUS : "); Serial.println(globals->externalGameModuleData[i].status);  
+        Serial.print("PROGRS: ");  Serial.println(globals->externalGameModuleData[i].progress);  
+        Serial.print("PROGMX: ");  Serial.println(globals->externalGameModuleData[i].progressMax);   
+      }
+    }
+  }
 }
 
 
@@ -719,6 +763,7 @@ uint16_t Interface::getCurrentAccessLevel(){
 //LOOP INTERFACE
 void Interface::loop(){
   updateDeltaMillis();
+  gm7Can->updateDeviceGameStatusAndProgress(globals->status, globals->progress, globals->progressMax);
   if(getIsEnabledKeypad()){
       readKeypad();
       parseCanRxBufferStorage();

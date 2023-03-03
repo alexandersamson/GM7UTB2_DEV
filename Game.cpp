@@ -17,7 +17,6 @@ void Game::reset(){
   lastUserInput = '\0';
   setState(GAME_STATE_UNPREPARED);
   attachAndResetGameModules();
-
 }
 
 uint32_t Game::start(){
@@ -38,25 +37,22 @@ uint32_t Game::start(){
 
 //TODO: This whole method is riddled with criss-cross calls and assignments. Needs to be cleaned.
 void Game::attachAndResetGameModules(){
+  Serial.print("Resetting Game...");
   activeModule = 0;
   globals->modulesAssignedIdIndexer = 0;
   interface->setActiveGameModule(activeModule);
   for(int i = 0; i < modulesCount; i++){
-    if(modules[i]->getIsExternalCanModule() == true){
-      globals->moduleConfigs[i].isExternalCanModule = true; //TODO: This is a very nasty place to put this assignment... Needs to go somehwere more logic
-      if(modules[i]->getIsOnlineOverCan() == false){
-        Serial.println("Found external module, but is offline.");
-        continue;
-      }
-      Serial.println("Found external module, which is online.");
-    }
-    Serial.println(i);
     modules[i]->assignInternalId(i);
     globals->moduleConfigs[i].id = i;
     globals->moduleConfigs[i].hasAssignedId = true;
     modules[i]->reset();
-    Serial.println("Resetting Game");
   }
+  for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+    if(globals->externalGameModuleData[i].isRegistered && ((globals->externalGameModuleData[i].status & GAME_MODULE_STATE_DISABLED) == 0)){
+      Serial.println("External Module Found (CAN bus).");
+    }
+  }
+  Serial.println(" DONE!");
 }
 
 
@@ -150,6 +146,14 @@ void Game::runModules(){
       disarmed = false;
     }
   }
+  for(int i = 0; i < EXTERNAL_MODULES_COUNT_MAX; i++){
+    if(globals->externalGameModuleData[i].isRegistered && ((globals->externalGameModuleData[i].status & GAME_MODULE_STATE_DISABLED) == 0) && ((globals->externalGameModuleData[i].status & GAME_MODULE_STATE_SOLVABLE ) > 0)){
+      // Serial.println(globals->externalGameModuleData[i].status);
+      if((globals->externalGameModuleData[i].status & GAME_MODULE_STATE_SOLVED ) == 0){
+        disarmed = false;
+      }
+    }
+  }
   if(disarmed == true && ((state & GAME_STATE_ENDED_WIN) == 0)){
     disarm();
     return;
@@ -233,9 +237,7 @@ void Game::handleInterfaceRequests(){
   }
   uint32_t requestedState = interface->consumeGameStateRequest();
   if(requestedState == GAME_STATE_STARTED){
-    if(state != GAME_STATE_UNPREPARED){
-      reset();
-    }
+    reset();
     start();
     interface->setSelectedInputConsumer(INPUT_CONSUMER_GAME);
   }
@@ -276,20 +278,15 @@ void Game::loop(){
   }
 
 
-  //These two conditions will send the main timer data over the can bus. When the timer is doing nothing, it will update once every 500 millis, otherwise 10 times per second.
-  if (chronoTimer10Fps.hasPassed(100)){
-    chronoTimer10Fps.restart();
-
-    if(mainTimer->isTicking()){
+  //This will send the main timer and validation timer data over the can bus. When the timer is doing nothing, it will update once every 500 millis, otherwise every 77 millis.
+  if (chronoTimer13Fps.hasPassed(77)){
+    chronoTimer13Fps.restart();
+    if(mainTimer->isTicking() || chronoTimer2Fps.hasPassed(500)){
+      chronoTimer2Fps.restart();
       interface->sendMainTimerOverCan(mainTimer->getGameTimeLeftCurrent(), mainTimer->getGameTimeLeftSet());
     }
-  }
-
-  if (chronoTimer2Fps.hasPassed(500)){
-    chronoTimer2Fps.restart();
-
-    if(mainTimer->isTicking() == false){
-      interface->sendMainTimerOverCan(mainTimer->getGameTimeLeftCurrent(), mainTimer->getGameTimeLeftSet());
+    if(modules[activeModule]->getStateIsValidating()){
+      interface->sendValidationTimerOverCan(modules[activeModule]->getValidationTimerCurrentMillisLeft(), modules[activeModule]->getValidationTimerSetMillis());
     }
   }
 

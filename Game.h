@@ -26,7 +26,7 @@ class Game {
     Constants *constants;
     Globals *globals;
     GameModule ** modules;
-    Chrono chronoTimer10Fps;
+    Chrono chronoTimer13Fps;
     Chrono chronoTimer2Fps;
 
     //MODULE INFO PACKAGE (From the Constants file)

@@ -163,6 +163,14 @@ void GMDisarmCode::setProgress(uint32_t prg) {
   GameModule::setProgressInternal(prg);
 }
 
+uint32_t GMDisarmCode::getValidationTimerCurrentMillisLeft(){
+  return validationTimer->getGameTimeLeftCurrent();
+}
+
+uint32_t GMDisarmCode::getValidationTimerSetMillis(){
+  return validationTimer->getGameTimeLeftSet();
+}
+
 
 void GMDisarmCode::inputKeyboard(char key) {
   if ((GameModule::getStateIsValidating() == true) && key == constants->keypadStar) {  //Reset an ongoing validation process

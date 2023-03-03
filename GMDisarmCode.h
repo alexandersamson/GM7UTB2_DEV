@@ -134,6 +134,8 @@ public:
   uint32_t getProgress();
   void setProgress(uint32_t prg); 
   void setState(uint32_t st);
+  uint32_t getValidationTimerCurrentMillisLeft();
+  uint32_t getValidationTimerSetMillis();
   void inputKeyboard(char key);
   void inputInteger(uint32_t num);
   void setGameModifierOutput(uint16_t newValue);
